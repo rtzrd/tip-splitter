@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Split the Check — Tip Calculator</title>
+<meta name="description" content="A quick, live tip splitter for groups. Enter the bill, pick a tip, split it." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4efe1;
+    --paper-shade: #ece4d0;
+    --ink: #1f1b16;
+    --ink-soft: #6b6151;
+    --accent: #c23b22;       /* stamp red */
+    --accent-deep: #9c2c17;
+    --line: #cdc3ab;
+    --total-bg: #1f1b16;
+    --total-ink: #f4efe1;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Courier Prime", monospace;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 20% 10%, #34302a 0%, #1d1a16 55%, #110f0c 100%);
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* subtle paper grain overlay on the page */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .receipt {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 27px, rgba(120,108,86,0.045) 27px 28px);
+    padding: 34px 26px 26px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.4) inset,
+      0 30px 60px -20px rgba(0,0,0,0.6),
+      0 10px 22px -12px rgba(0,0,0,0.5);
+    /* torn / perforated top + bottom edges */
+    --tear: 9px;
+    -webkit-mask:
+      radial-gradient(var(--tear) at 50% 0, transparent 98%, #000) 0 0 / 20px var(--tear) repeat-x,
+      radial-gradient(var(--tear) at 50% 100%, transparent 98%, #000) 0 100% / 20px var(--tear) repeat-x,
+      linear-gradient(#000 0 0) 0 var(--tear) / 100% calc(100% - var(--tear)*2) no-repeat;
+            mask:
+      radial-gradient(var(--tear) at 50% 0, transparent 98%, #000) 0 0 / 20px var(--tear) repeat-x,
+      radial-gradient(var(--tear) at 50% 100%, transparent 98%, #000) 0 100% / 20px var(--tear) repeat-x,
+      linear-gradient(#000 0 0) 0 var(--tear) / 100% calc(100% - var(--tear)*2) no-repeat;
+    animation: drop .6s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @keyframes drop {
+    from { opacity: 0; transform: translateY(-14px) rotate(-.6deg); }
+    to   { opacity: 1; transform: translateY(0) rotate(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .receipt, .stamp, .row, .total { animation: none !important; }
+  }
+
+  header { text-align: center; margin-bottom: 6px; }
+
+  .eyebrow {
+    font-size: 11px; letter-spacing: .35em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 600;
+    font-size: 38px;
+    line-height: .95;
+    letter-spacing: -.01em;
+    margin: 8px 0 6px;
+  }
+  h1 em { font-style: italic; color: var(--accent-deep); }
+
+  .meta {
+    font-size: 11px; color: var(--ink-soft); letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .rule {
+    border: none;
+    border-top: 2px dashed var(--line);
+    margin: 18px 0;
+  }
+
+  label.field-label {
+    display: block;
+    font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+
+  .bill-input {
+    display: flex; align-items: baseline; gap: 6px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 6px;
+  }
+  .bill-input .cur {
+    font-family: "Fraunces", serif; font-size: 28px; font-weight: 600;
+  }
+  .bill-input input {
+    flex: 1; width: 100%;
+    border: none; background: transparent;
+    font-family: "Fraunces", serif; font-weight: 600;
+    font-size: 34px; color: var(--ink);
+    letter-spacing: -.01em;
+  }
+  .bill-input input:focus { outline: none; }
+  .bill-input input::placeholder { color: var(--line); }
+
+  .tips {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  .tip-btn {
+    font-family: "Courier Prime", monospace;
+    font-weight: 700; font-size: 15px;
+    padding: 11px 0;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform .08s ease, background .15s ease, color .15s ease;
+  }
+  .tip-btn:hover { background: var(--paper-shade); }
+  .tip-btn:active { transform: translateY(1px); }
+  .tip-btn.active {
+    background: var(--accent); border-color: var(--accent-deep);
+    color: #fff;
+    box-shadow: 0 3px 0 var(--accent-deep);
+  }
+
+  .custom-tip {
+    margin-top: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .custom-tip label {
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-soft); white-space: nowrap;
+  }
+  .custom-tip .wrap {
+    flex: 1; display: flex; align-items: center;
+    border-bottom: 1.5px solid var(--line);
+  }
+  .custom-tip input {
+    width: 100%; border: none; background: transparent;
+    font-family: "Courier Prime", monospace; font-weight: 700;
+    font-size: 16px; color: var(--ink); text-align: right; padding: 4px 4px;
+  }
+  .custom-tip input:focus { outline: none; }
+  .custom-tip .pct { font-weight: 700; }
+
+  /* stepper for people */
+  .people {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1.5px solid var(--ink); padding: 6px 8px;
+  }
+  .stepper {
+    width: 38px; height: 38px;
+    font-family: "Fraunces", serif; font-size: 24px; line-height: 1;
+    background: var(--ink); color: var(--paper); border: none; cursor: pointer;
+    transition: transform .08s ease, background .15s;
+  }
+  .stepper:hover { background: var(--accent); }
+  .stepper:active { transform: scale(.92); }
+  .stepper:disabled { opacity: .3; cursor: not-allowed; }
+  .people .count {
+    text-align: center;
+  }
+  .people .count input {
+    width: 70px; border: none; background: transparent;
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 30px;
+    text-align: center; color: var(--ink);
+  }
+  .people .count input:focus { outline: none; }
+  .people .count span {
+    display: block; font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft); margin-top: -2px;
+  }
+
+  .warn {
+    color: var(--accent-deep); font-size: 12px; margin-top: 8px;
+    min-height: 16px; letter-spacing: .03em;
+  }
+
+  /* output rows */
+  .lines { margin-top: 4px; }
+  .row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 9px 0;
+    font-size: 14px;
+  }
+  .row .dotfill {
+    flex: 1; border-bottom: 1.5px dotted var(--line);
+    margin: 0 8px; transform: translateY(-3px);
+  }
+  .row .lbl { letter-spacing: .04em; }
+  .row .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .total {
+    margin-top: 14px;
+    background: var(--total-bg); color: var(--total-ink);
+    padding: 16px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .total .lbl {
+    font-size: 11px; letter-spacing: .25em; text-transform: uppercase;
+  }
+  .total .lbl small { display: block; color: #b8ad97; letter-spacing:.1em; margin-top:3px;}
+  .total .val {
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 40px;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .total .val .cur { font-size: 22px; vertical-align: 6px; margin-right: 1px; }
+
+  .grand {
+    text-align: center; margin-top: 16px;
+    font-size: 13px; color: var(--ink-soft); letter-spacing: .04em;
+  }
+  .grand b { color: var(--ink); font-weight: 700; }
+
+  /* stamp */
+  .stamp {
+    position: absolute; top: 86px; right: -6px;
+    transform: rotate(9deg);
+    border: 2.5px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 10px;
+    font-weight: 700; font-size: 12px; letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .8;
+    border-radius: 3px;
+    animation: stampin .5s .35s both cubic-bezier(.16,1.4,.3,1);
+  }
+  @keyframes stampin {
+    from { opacity: 0; transform: rotate(9deg) scale(1.7); }
+    to   { opacity: .8; transform: rotate(9deg) scale(1); }
+  }
+
+  footer {
+    margin-top: 20px; text-align: center;
+    font-size: 11px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .barcode {
+    height: 34px; margin: 10px auto 6px; width: 70%;
+    background: repeating-linear-gradient(90deg,
+      var(--ink) 0 2px, transparent 2px 4px,
+      var(--ink) 4px 5px, transparent 5px 9px,
+      var(--ink) 9px 12px, transparent 12px 14px);
+    opacity: .85;
+  }
+</style>
+</head>
+<body>
+  <main class="receipt" role="application" aria-label="Tip splitting calculator">
+    <span class="stamp">Paid · Split</span>
+    <header>
+      <div class="eyebrow">Table Service</div>
+      <h1>Split the <em>Check</em></h1>
+      <div class="meta">Tip &amp; Share Calculator</div>
+    </header>
+
+    <hr class="rule" />
+
+    <!-- BILL -->
+    <label class="field-label" for="bill">Bill Total</label>
+    <div class="bill-input">
+      <span class="cur">$</span>
+      <input id="bill" type="text" inputmode="decimal" placeholder="0.00"
+             aria-label="Bill total in dollars" autocomplete="off" />
+    </div>
+
+    <hr class="rule" />
+
+    <!-- TIP -->
+    <label class="field-label">Tip Percentage</label>
+    <div class="tips" role="group" aria-label="Tip percentage">
+      <button class="tip-btn" data-tip="10">10%</button>
+      <button class="tip-btn active" data-tip="15">15%</button>
+      <button class="tip-btn" data-tip="20">20%</button>
+      <button class="tip-btn" data-tip="25">25%</button>
+    </div>
+    <div class="custom-tip">
+      <label for="customTip">Custom</label>
+      <div class="wrap">
+        <input id="customTip" type="text" inputmode="decimal" placeholder="—"
+               aria-label="Custom tip percentage" autocomplete="off" />
+        <span class="pct">%</span>
+      </div>
+    </div>
+
+    <hr class="rule" />
+
+    <!-- PEOPLE -->
+    <label class="field-label">Splitting Between</label>
+    <div class="people">
+      <button class="stepper" id="minus" aria-label="Fewer people">–</button>
+      <div class="count">
+        <input id="people" type="text" inputmode="numeric" value="2"
+               aria-label="Number of people" autocomplete="off" />
+        <span id="peopleLabel">People</span>
+      </div>
+      <button class="stepper" id="plus" aria-label="More people">+</button>
+    </div>
+    <div class="warn" id="warn" role="status" aria-live="polite"></div>
+
+    <hr class="rule" />
+
+    <!-- OUTPUT -->
+    <div class="lines">
+      <div class="row">
+        <span class="lbl">Tip Total <span id="tipPctEcho">(15%)</span></span>
+        <span class="dotfill"></span>
+        <span class="val" id="tipTotal">$0.00</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Grand Total</span>
+        <span class="dotfill"></span>
+        <span class="val" id="grandTotal">$0.00</span>
+      </div>
+    </div>
+
+    <div class="total">
+      <div class="lbl">Per Person<small id="perCount">÷ 2 people</small></div>
+      <div class="val"><span class="cur">$</span><span id="perPerson">0.00</span></div>
+    </div>
+
+    <div class="grand">
+      Each pays <b id="tipPerPerson">$0.00</b> tip + their share
+    </div>
+
+    <div class="barcode" aria-hidden="true"></div>
+    <footer>Thank you · Come again</footer>
+  </main>
+
+<script>
+(function () {
+  "use strict";
+
+  var billEl     = document.getElementById("bill");
+  var customEl   = document.getElementById("customTip");
+  var peopleEl   = document.getElementById("people");
+  var minusEl    = document.getElementById("minus");
+  var plusEl     = document.getElementById("plus");
+  var warnEl     = document.getElementById("warn");
+  var tipBtns    = Array.prototype.slice.call(document.querySelectorAll(".tip-btn"));
+
+  var tipTotalEl   = document.getElementById("tipTotal");
+  var grandTotalEl = document.getElementById("grandTotal");
+  var perPersonEl  = document.getElementById("perPerson");
+  var tipPerPersonEl = document.getElementById("tipPerPerson");
+  var tipPctEchoEl = document.getElementById("tipPctEcho");
+  var perCountEl   = document.getElementById("perCount");
+  var peopleLabel  = document.getElementById("peopleLabel");
+
+  var MAX_PEOPLE = 20;
+  var MIN_PEOPLE = 1;
+  var tipPct = 15;        // active preset/custom value
+  var usingCustom = false;
+
+  function money(n) {
+    return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // Parse a possibly-messy numeric string. Returns null when not a valid number.
+  function parseNum(str) {
+    if (str == null) return null;
+    var cleaned = String(str).replace(/[^0-9.]/g, "");
+    if (cleaned === "" || cleaned === ".") return null;
+    var n = parseFloat(cleaned);
+    return isFinite(n) ? n : null;
+  }
+
+  function getBill() {
+    var b = parseNum(billEl.value);
+    if (b === null || b < 0) return 0;   // negatives & blanks treated as 0
+    return b;
+  }
+
+  function getPeople() {
+    var p = parseNum(peopleEl.value);
+    if (p === null) return null;          // empty / invalid -> flagged
+    p = Math.floor(p);
+    return p;
+  }
+
+  function getTip() {
+    if (tipPct === null || tipPct < 0) return 0;
+    return tipPct;
+  }
+
+  function recalc() {
+    var bill   = getBill();
+    var pct    = getTip();
+    var people = getPeople();
+
+    var warning = "";
+    var validPeople = people;
+
+    if (people === null) {
+      warning = "Enter the number of people.";
+      validPeople = null;
+    } else if (people < MIN_PEOPLE) {
+      warning = "At least 1 person needed to split.";
+      validPeople = null;
+    } else if (people > MAX_PEOPLE) {
+      warning = "Max " + MAX_PEOPLE + " people.";
+      validPeople = MAX_PEOPLE;
+    }
+
+    var tipTotal   = bill * (pct / 100);
+    var grandTotal = bill + tipTotal;
+
+    // echo tip percent everywhere (3rd of the four required values)
+    var pctLabel = (Math.round(pct * 100) / 100) + "%";
+    tipPctEchoEl.textContent = "(" + pctLabel + ")";
+
+    tipTotalEl.textContent   = money(tipTotal);
+    grandTotalEl.textContent = money(grandTotal);
+
+    if (validPeople && validPeople > 0) {
+      perPersonEl.textContent    = (grandTotal / validPeople).toFixed(2)
+                                     .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      tipPerPersonEl.textContent = money(tipTotal / validPeople);
+      perCountEl.textContent     = "÷ " + validPeople +
+                                   (validPeople === 1 ? " person" : " people");
+      peopleLabel.textContent    = validPeople === 1 ? "Person" : "People";
+    } else {
+      // graceful fallback — never show NaN
+      perPersonEl.textContent    = "0.00";
+      tipPerPersonEl.textContent = "$0.00";
+      perCountEl.textContent     = "÷ — people";
+    }
+
+    warnEl.textContent = warning;
+    minusEl.disabled = validPeople !== null && validPeople <= MIN_PEOPLE;
+    plusEl.disabled  = validPeople !== null && validPeople >= MAX_PEOPLE;
+  }
+
+  // --- Tip preset buttons ---
+  tipBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      tipBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      tipPct = parseFloat(btn.getAttribute("data-tip"));
+      usingCustom = false;
+      customEl.value = "";
+      recalc();
+    });
+  });
+
+  // --- Custom tip ---
+  customEl.addEventListener("input", function () {
+    var c = parseNum(customEl.value);
+    if (c === null) {
+      // blank custom -> fall back to whichever preset is active, or 0
+      usingCustom = false;
+      var active = document.querySelector(".tip-btn.active");
+      tipPct = active ? parseFloat(active.getAttribute("data-tip")) : 0;
+    } else {
+      usingCustom = true;
+      tipPct = c;
+      tipBtns.forEach(function (b) { b.classList.remove("active"); });
+    }
+    recalc();
+  });
+
+  // --- People stepper ---
+  function nudge(delta) {
+    var cur = getPeople();
+    if (cur === null) cur = 0;
+    var next = Math.min(MAX_PEOPLE, Math.max(MIN_PEOPLE, cur + delta));
+    peopleEl.value = next;
+    recalc();
+  }
+  minusEl.addEventListener("click", function () { nudge(-1); });
+  plusEl.addEventListener("click", function () { nudge(1); });
+
+  // --- Live inputs ---
+  billEl.addEventListener("input", recalc);
+  peopleEl.addEventListener("input", recalc);
+  peopleEl.addEventListener("blur", function () {
+    var p = getPeople();
+    if (p !== null && p > MAX_PEOPLE) peopleEl.value = MAX_PEOPLE;
+    if (p !== null && p < MIN_PEOPLE) peopleEl.value = MIN_PEOPLE;
+    recalc();
+  });
+
+  recalc();
+})();
+</script>
+</body>
+</html>
