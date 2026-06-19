@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 420, height: 900 } });
+await p.goto('file:///D:/Workspaces/tip-splitter/index.html');
+await p.fill('#bill', '100');
+await p.click('.tip-btn[data-tip="20"]');
+await p.fill('#people', '4');
+await p.screenshot({ path: 'preview.png', fullPage: true });
+await b.close();
+console.log('shot done');

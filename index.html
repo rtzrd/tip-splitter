@@ -236,7 +236,14 @@
     font-family: "Fraunces", serif; font-weight: 600; font-size: 40px;
     font-variant-numeric: tabular-nums; line-height: 1;
   }
-  .total .val .cur { font-size: 22px; vertical-align: 6px; margin-right: 1px; }
+
+  .tag {
+    display: inline-block;
+    background: var(--accent); color: #fff;
+    font-weight: 700; font-size: 11px;
+    padding: 1px 6px; border-radius: 3px; letter-spacing: .05em;
+    vertical-align: 1px;
+  }
 
   .grand {
     text-align: center; margin-top: 16px;
@@ -335,9 +342,19 @@
     <!-- OUTPUT -->
     <div class="lines">
       <div class="row">
-        <span class="lbl">Tip Total <span id="tipPctEcho">(15%)</span></span>
+        <span class="lbl">Tip&nbsp;% <span class="tag" id="tipPctEcho">15%</span></span>
+        <span class="dotfill"></span>
+        <span class="val" id="tipPctVal">15%</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Tip Total</span>
         <span class="dotfill"></span>
         <span class="val" id="tipTotal">$0.00</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Tip / Person</span>
+        <span class="dotfill"></span>
+        <span class="val" id="tipPerPerson">$0.00</span>
       </div>
       <div class="row">
         <span class="lbl">Grand Total</span>
@@ -347,12 +364,8 @@
     </div>
 
     <div class="total">
-      <div class="lbl">Per Person<small id="perCount">÷ 2 people</small></div>
-      <div class="val"><span class="cur">$</span><span id="perPerson">0.00</span></div>
-    </div>
-
-    <div class="grand">
-      Each pays <b id="tipPerPerson">$0.00</b> tip + their share
+      <div class="lbl">Amount / Person<small id="perCount">÷ 2 people</small></div>
+      <div class="val" id="perPersonBlock">$0.00</div>
     </div>
 
     <div class="barcode" aria-hidden="true"></div>
@@ -371,13 +384,14 @@
   var warnEl     = document.getElementById("warn");
   var tipBtns    = Array.prototype.slice.call(document.querySelectorAll(".tip-btn"));
 
-  var tipTotalEl   = document.getElementById("tipTotal");
-  var grandTotalEl = document.getElementById("grandTotal");
-  var perPersonEl  = document.getElementById("perPerson");
+  var tipTotalEl     = document.getElementById("tipTotal");
+  var grandTotalEl   = document.getElementById("grandTotal");
+  var perPersonEl    = document.getElementById("perPersonBlock");
   var tipPerPersonEl = document.getElementById("tipPerPerson");
-  var tipPctEchoEl = document.getElementById("tipPctEcho");
-  var perCountEl   = document.getElementById("perCount");
-  var peopleLabel  = document.getElementById("peopleLabel");
+  var tipPctEchoEl   = document.getElementById("tipPctEcho");
+  var tipPctValEl    = document.getElementById("tipPctVal");
+  var perCountEl     = document.getElementById("perCount");
+  var peopleLabel    = document.getElementById("peopleLabel");
 
   var MAX_PEOPLE = 20;
   var MIN_PEOPLE = 1;
@@ -437,23 +451,23 @@
     var tipTotal   = bill * (pct / 100);
     var grandTotal = bill + tipTotal;
 
-    // echo tip percent everywhere (3rd of the four required values)
+    // tip percent (one of the four required values) — shown in 3 places
     var pctLabel = (Math.round(pct * 100) / 100) + "%";
-    tipPctEchoEl.textContent = "(" + pctLabel + ")";
+    tipPctEchoEl.textContent = pctLabel;
+    tipPctValEl.textContent  = pctLabel;
 
     tipTotalEl.textContent   = money(tipTotal);
     grandTotalEl.textContent = money(grandTotal);
 
     if (validPeople && validPeople > 0) {
-      perPersonEl.textContent    = (grandTotal / validPeople).toFixed(2)
-                                     .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      perPersonEl.textContent    = money(grandTotal / validPeople);
       tipPerPersonEl.textContent = money(tipTotal / validPeople);
       perCountEl.textContent     = "÷ " + validPeople +
                                    (validPeople === 1 ? " person" : " people");
       peopleLabel.textContent    = validPeople === 1 ? "Person" : "People";
     } else {
       // graceful fallback — never show NaN
-      perPersonEl.textContent    = "0.00";
+      perPersonEl.textContent    = "$0.00";
       tipPerPersonEl.textContent = "$0.00";
       perCountEl.textContent     = "÷ — people";
     }
